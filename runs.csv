@@ -1,0 +1,2 @@
+N1,N2,dataset,eps_f,eps_i,initmode,ntype,num_iter,quantization_error,sigma_i,topographic_error
+10.0,10.0,iris,0.005,0.2,UNIFORM,GAUSSIAN,1000.0,0.4324147181783223,1.0,0.16666666666666666
