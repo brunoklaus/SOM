@@ -5,7 +5,7 @@ from som import som
 parser = argparse.ArgumentParser(description='')
 
 
-parser.add_argument('--dataset', dest='dataset', default='iris', help='chosen dataset')
+parser.add_argument('--dataset', dest='dataset', default='box', help='chosen dataset')
 
 
 

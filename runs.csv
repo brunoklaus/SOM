@@ -1,2 +1,3 @@
-N1,N2,dataset,eps_f,eps_i,initmode,ntype,num_iter,quantization_error,sigma_i,topographic_error
-10.0,10.0,iris,0.005,0.2,UNIFORM,GAUSSIAN,1000.0,0.4324147181783223,1.0,0.16666666666666666
+N1,N2,dataset,eps_f,eps_i,gridmode,initmode,ntype,num_iter,quantization_error,sigma_i,topographic_error
+10.0,10.0,box,0.005,0.5,HEXAGON,PCAINIT,GAUSSIAN,10000.0,0.25589478130558363,3.0,0.1
+10,10,box,0.005,0.5,HEXAGON,PCAINIT,GAUSSIAN,10000,0.28795796148661046,3,0.11

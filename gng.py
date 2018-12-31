@@ -207,11 +207,11 @@ class gng(object):
         X = self.X_placeholder
         W = self.W_placeholder
         #Step 3: Calculate two nearest
-        self.distances = tf.map_fn(lambda w: X - w,W)
+        self.dist_vecs = tf.map_fn(lambda w: X - w,W)
         self.squared_distances = tf.map_fn(lambda w: 2.0*tf.nn.l2_loss(X - w),W)
         self.s = tf.math.top_k(-self.squared_distances,k=2) 
-        self.s1 = self.s.indices[0]
-        self.s2 = self.s.indices[1]
+        self.s1_2d = self.s.indices[0]
+        self.s2_2d = self.s.indices[1]
 
     def get_random_choice(self):
         return (tf.random.uniform(shape=[],minval=0,maxval=(self.n_input-1),dtype=tf.int64))
@@ -227,11 +227,11 @@ class gng(object):
             print("Iteration {}".format(current_iter))
             nxt = self.sess.run(self.iter_next)["X"]
         #Step 3
-            s1, s2, d, sq = self.sess.run([self.s1, self.s2, self.distances,\
+            s1, s2, d, sq = self.sess.run([self.s1_2d, self.s2_2d, self.dist_vecs,\
                                             self.squared_distances],\
                                            feed_dict = {self.X_placeholder: nxt,\
                                                         self.W_placeholder: self.W})
-        #Step 4a: If a connection between s1 and s2 does not exist already, create it
+        #Step 4a: If a connection between s1_2d and s2_2d does not exist already, create it
             if not self.g.are_connected(s1, s2):
                 self.g.add_edges([(s1,s2)])
 
@@ -242,7 +242,7 @@ class gng(object):
         #Step 5: Add squared error of winner to its accumulated error
             self.g.vs[s1]["accumulated_error"] += sq[s1]
             
-            #Get neighborhood of s1
+            #Get neighborhood of s1_2d
             N_s1 = self.g.neighbors(s1)
             
         #BEGIN STEP 6
@@ -382,7 +382,7 @@ class gng(object):
         for i in np.arange(v_len):
             v_colors[v_order[i]] = int(np.round(i*float(num_pallete-1) /float(v_len-1)) ) 
         
-        #TODO: Create colors for vertices (s1, s2, neighbor of s1, none)
+        #TODO: Create colors for vertices (s1_2d, s2_2d, neighbor of s1_2d, none)
         v_colors = [np.asscalar(a) for a in v_colors]
         
         
