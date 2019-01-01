@@ -6,7 +6,22 @@ parser = argparse.ArgumentParser(description='')
 
 
 parser.add_argument('--dataset', dest='dataset', default='box', help='chosen dataset')
+parser.add_argument('--n1', dest='n1', type=int, default=10, help='number of units in each row')
+parser.add_argument('--n2', dest='n2', type=int, default=10, help='number of units in each col')
+parser.add_argument('--run_id', dest='run_id', type=int, default=0, help='An ID identifying this run')
 
+parser.add_argument('--sigma_i', dest='sigma_i', type=float, default=3, help='Initial value of sigma')
+parser.add_argument('--sigma_f', dest='sigma_f', type=float, default=0.1, help='Final Value of sigma')
+parser.add_argument('--eps_i', dest='eps_i', type=float, default=0.5, help='Initial learning rate')
+parser.add_argument('--eps_f', dest='eps_f', type=float, default=0.005, help='Final learning rate')
+
+parser.add_argument('--ntype', dest='ntype', default="GAUSSIAN", help='nborhood type (GAUSSIAN,CONSTANT)')
+parser.add_argument('--plotmode', dest='plotmode', default="CLASS_COLOR", help='plot mode (CLASS_COLOR,CLASS_NOCOLOR)')
+parser.add_argument('--gridmode', dest='gridmode', default="RECTANGLE", help='grid type (RECTANGLE,HEXAGON)')
+parser.add_argument('--initmode', dest='initmode', default="PCAINIT", help='initialization (RANDOM,PCAINIT)')
+
+parser.add_argument('--n_iter', dest='n_iter', type=int, default=10000, help='total number of iterations')
+parser.add_argument('--plot_iter', dest='plot_iter', type=int, default=10000, help='number of iterations between plots')
 
 
 

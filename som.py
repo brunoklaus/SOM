@@ -24,6 +24,7 @@ import plotly.io as pio
 import plotly.graph_objs as go
 from asn1crypto.core import InstanceOf
 import sklearn
+import os
 
 plotly.tools.set_credentials_file(username='isonettv', api_key='2Lg1USMkZAHONqo82eMG')
 
@@ -105,55 +106,56 @@ class som(object):
         
         self.sess = sess
         
-        #TODO: use arguments to get parameters 
+        
+        self.run_id = args.run_id 
+        
         #Number of nodes in each row of the grid
-        self.N1 = 10 
+        self.N1 = args.n1 
         #Number of nodes in each column of the grid
-        self.N2 = 10 
+        self.N2 = args.n2 
         
         #Initial and final values of epsilon
-        self.eps_i = 0.5
-        self.eps_f = 0.005
+        self.eps_i = args.eps_i
+        self.eps_f = args.eps_f
         
         #Initial and final values of sigma
-        self.sigma_i = 3
-        self.sigma_f = 0.1
+        self.sigma_i = args.sigma_i
+        self.sigma_f = args.sigma_f
         
         #Neighborhood type
-        self.ntype = NFunc["GAUSSIAN"]
+        self.ntype = NFunc[args.ntype]
 
         #Which plot to make
-        self.plotmode = PlotMode["CLASS_COLOR"]
+        self.plotmode = PlotMode[args.plotmode]
         
         #Grid Mode
-        self.gridmode = GridMode["HEXAGON"]
+        self.gridmode = GridMode[args.gridmode]
         
         self.nsize = 1
         
         #Which way to initialize points
-        self.initmode = InitMode["PCAINIT"]
-        #interval (for random initialization only)
-        self.init_maxval = 0.1
+        self.initmode = InitMode[args.initmode]
         
         #dataset chosen
         self.ds_name = args.dataset
         
         #Total number of iterations
-        self.n_iter = 10000
+        self.n_iter = args.n_iter
         #Number of iterations between plot op
-        self.plot_iter = 100
+        self.plot_iter = args.plot_iter
         
         self.characteristics_dict = \
             {"dataset":str(self.ds_name),
              "num_iter":self.n_iter,
-            "N1":self.N1,
-             "N2":self.N2,
+            "n1":self.N1,
+             "n2":self.N2,
              "eps_i":self.eps_i,
              "eps_f":self.eps_f,
              "sigma_i":self.sigma_i,
              "ntype":self.ntype.name,
              "initmode":self.initmode.name,
-             "gridmode":self.gridmode.name                
+             "gridmode":self.gridmode.name,
+             "run_id":self.run_id                
             }
         
         #Get datasets
@@ -369,6 +371,12 @@ class som(object):
                                np.arange(self.N1*self.N2))),dtype=np.int32 )
         self.ID = np.reshape(self.ID,(-1,2))
         
+        #Initialize distances
+        print("Calculating distances...")
+        self.D = np.array(self.g.shortest_paths(source=None, target=None, weights=None, mode=ig.ALL),dtype=np.int32)
+        print("Done!")
+        
+        
 
     def build_model(self):
         X = self.X_placeholder
@@ -392,7 +400,8 @@ class som(object):
         
         
         #Step 5: Calculate l1 distances
-        self.l1 = tf.map_fn(lambda x: tf.norm(x-self.s1_2d,ord=1),self.ID)
+        #self.l1 = tf.map_fn(lambda x: tf.norm(x-self.s1_2d,ord=1),self.ID)
+        self.l1 = tf.gather(self.D,self.s1_1d)
         self.mask = tf.reshape(tf.where(self.l1 <= nsize),\
                                         tf.convert_to_tensor([-1]))
 
@@ -412,25 +421,47 @@ class som(object):
        
         
     def cycle(self, current_iter, mode = Mode["TRAIN"]):
-        #Iteration numbers as floats
-        current_iter_f = float(current_iter)
-        n_iter_f = float(self.n_iter)
         
         nxt = self.sess.run(self.iter_next)["X"]
         
+        if mode.name == "TRAIN":   
+            #Iteration numbers as floats
+            current_iter_f = float(current_iter)
+            n_iter_f = float(self.n_iter)
+            
+            
+            #Get current epsilon and theta
+            eps = self.eps_i * np.power(self.eps_f/self.eps_i,current_iter_f/n_iter_f)
+            sigma = self.sigma_i * np.power(self.sigma_f/self.sigma_i,current_iter_f/n_iter_f)
         
-        #Get current epsilon and theta
-        eps = self.eps_i * np.power(self.eps_f/self.eps_i,current_iter_f/n_iter_f)
-        sigma = self.sigma_i * np.power(self.sigma_f/self.sigma_i,current_iter_f/n_iter_f)
+            print("Iteration {} - sigma {} - epsilon {}".format(current_iter,sigma,eps))
         
-        print("Iteration {} - sigma {} - epsilon {}".format(current_iter,sigma,eps))
-        
-        #Get vector distance, square distance
-        self.dist_vecs = np.array(list(map(lambda w: nxt - w,self.W)))
-        self.squared_distances = np.array(list(map(lambda w: np.linalg.norm(nxt - w,ord=2),self.W)))
+            #Get vector distance, square distance
+            self.dist_vecs = np.array(list(map(lambda w: nxt - w,self.W)))
+            self.squared_distances = np.array(list(map(lambda w: np.linalg.norm(nxt - w,ord=2),self.W)))
+            self.s1_1d = np.argmin(self.squared_distances,axis=-1)
+            self.s1_2d = self.ID[self.s1_1d]
+    
+            #Get L1 distances
+            #self.l1 = np.array(list(map(lambda x: np.linalg.norm(x - self.s1_2d,ord=1),self.ID)))
+            self.l1 = self.D[self.s1_1d,:]
+            
+            self.mask = np.reshape(np.where(self.l1 <=   sigma),[-1])
+            
+            if self.ntype.name == "GAUSSIAN":
+                squared_l1 = np.square(self.l1.astype(np.float32))
+                self.h = np.exp(-squared_l1 /(2.0*sigma*sigma))
+            elif self.ntype.name == "CONSTANT":
+                self.h = np.reshape(np.where(self.l1 <=  sigma,1,0),[-1])
+            
+            for i in np.arange(self.N1*self.N2):
+                self.W[i,:] += eps * self.h[i] * self.dist_vecs[i,:]
+
 
         
-        if mode.name == "TEST":   
+        elif mode.name == "TEST":   
+            self.dist_vecs = np.array(list(map(lambda w: nxt - w,self.W)))
+            self.squared_distances = np.array(list(map(lambda w: np.linalg.norm(nxt - w,ord=2),self.W)))
             #Get first and second activation
             top_2 = np.argsort(self.squared_distances)[0:2]
             self.s1_1d = top_2[0]
@@ -442,28 +473,11 @@ class som(object):
                 topographic_error = 0
             else:
                 topographic_error = 1
+                #print("ERROR {}-{};{}-{}".format(self.s1_2d,self.squared_distances[self.s1_1d],\
+                #                                 self.s2_2d,self.squared_distances[self.s2_1d] ))
             #Get quantization error
             quantization_error = (self.squared_distances[self.s1_1d])     
-        else:
-            self.s1_1d = np.argmin(self.squared_distances,axis=-1)
-            self.s1_2d = self.ID[self.s1_1d]
-        
-        
-        
-        self.l1 = np.array(list(map(lambda x: np.linalg.norm(x - self.s1_2d,ord=1),self.ID)))
-        self.mask = np.reshape(np.where(self.l1 <=  1.38739 * sigma),[-1])
-        
-
-        squared_l1 = -np.square(self.l1.astype(np.float32))
-        if self.ntype.name == "GAUSSIAN":
-            self.h = np.exp(squared_l1 /(2.0*sigma*sigma))
-        elif self.ntype.name == "CONSTANT":
-            self.h = np.reshape(np.where(self.l1 <= 1.38739 * sigma,1,0),[-1])
-        
-        for i in np.arange(self.N1*self.N2):
-            self.W[i,:] += eps * self.h[i] * self.dist_vecs[i,:]
-            
-        if mode.name == "TEST":   
+      
             return ({"topographic_error":topographic_error,\
                      "quantization_error":quantization_error})
             
@@ -697,13 +711,26 @@ class som(object):
                 ],    )       
         data=[trace1, trace2, trace0]
         fig=go.Figure(data=data, layout=layout)
+        
+        OUTPATH = "./plot/"
+        for k, v in sorted(zip(self.characteristics_dict.keys(),self.characteristics_dict.values()),key = lambda t: (t[0].lower()) ):
+            OUTPATH += str(k)+ "=" + str(v) + ";"
+        OUTPATH = OUTPATH[0:(len(OUTPATH) - 1)]
+            
+        if not os.path.exists(OUTPATH): 
+            os.mkdir(OUTPATH)
+
+        
+     
+        
+        
         print("Plotting graph...")
         if online:
             try:
                 py.iplot(fig)
             except plotly.exceptions.PlotlyRequestError:
                 print("Warning: Could not plot online")
-        pio.write_image(fig,"./plot/graph_" + str(iter_number) + ".png")
+        pio.write_image(fig,OUTPATH + "/" + str(iter_number) + ".png")
         print("Done!")  
          
         
